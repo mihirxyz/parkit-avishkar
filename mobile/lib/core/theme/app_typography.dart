@@ -43,13 +43,21 @@ class AppTypography {
         fontSize: 13,
         fontWeight: FontWeight.w400,
         color: AppColors.textSecondary,
+        height: 1.4,
       );
 
   static TextStyle get labelSmall => GoogleFonts.plusJakartaSans(
         fontSize: 11,
         fontWeight: FontWeight.w600,
-        color: AppColors.textMuted,
+        color: AppColors.textSecondary,
         letterSpacing: 0.3,
+      );
+
+  static TextStyle get badgeLabel => GoogleFonts.plusJakartaSans(
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textPrimary,
+        letterSpacing: 0.2,
       );
 
   static TextStyle get numericMetric => GoogleFonts.jetBrainsMono(

@@ -45,10 +45,10 @@ class ErrorStateView extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               message,
-              style: AppTypography.bodyMedium.copyWith(color: AppColors.textMuted),
+              style: AppTypography.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
               textAlign: TextAlign.center,
-              maxLines: 4,
-              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
@@ -58,7 +58,11 @@ class ErrorStateView extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.surfaceElevated,
                 foregroundColor: AppColors.primary,
-                side: const BorderSide(color: AppColors.surfaceBorder),
+                minimumSize: const Size(160, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: const BorderSide(color: AppColors.surfaceBorder),
+                ),
               ),
             ),
           ],

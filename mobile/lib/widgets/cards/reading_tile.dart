@@ -4,7 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/vehicle_reading.dart';
 
-/// Clean list tile rendering a vehicle reading timestamp, ID, and inference state.
+/// Clean, plain-language activity tile rendering a recent car update.
 class ReadingTile extends StatelessWidget {
   final VehicleReading reading;
 
@@ -15,27 +15,39 @@ class ReadingTile extends StatelessWidget {
     final isParked = reading.isParked;
     final stateColor = isParked ? AppColors.stateParked : AppColors.stateMoving;
     final timeFormatted = DateFormat('HH:mm:ss').format(reading.timestamp);
+    final headline = isParked ? 'Parked car detected' : 'Passing car detected';
+    final subLabel = isParked ? 'Spot taken' : 'Driving through';
+
+    String? speedLabel;
+    if (reading.gpsSpeed != null) {
+      final kmh = (reading.gpsSpeed! * 3.6).round();
+      speedLabel = kmh <= 1 ? 'Stopped' : '$kmh km/h';
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: AppColors.surfaceElevated,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.surfaceBorder),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
               color: stateColor.withAlpha(25),
               shape: BoxShape.circle,
             ),
             child: Icon(
-              isParked ? Icons.local_parking_rounded : Icons.directions_car_rounded,
+              isParked
+                  ? Icons.local_parking_rounded
+                  : Icons.directions_car_rounded,
               color: stateColor,
-              size: 16,
+              size: 18,
             ),
           ),
           const SizedBox(width: 12),
@@ -47,7 +59,7 @@ class ReadingTile extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      reading.vehicleId,
+                      headline,
                       style: AppTypography.titleMedium.copyWith(fontSize: 14),
                     ),
                     Text(
@@ -60,25 +72,18 @@ class ReadingTile extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      'State: ${reading.predictedState.toUpperCase()}',
+                      subLabel,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: stateColor,
                       ),
                     ),
-                    if (reading.confidence != null) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        '(${(reading.confidence! * 100).toStringAsFixed(1)}% conf)',
-                        style: AppTypography.labelSmall,
-                      ),
-                    ],
-                    if (reading.gpsSpeed != null) ...[
+                    if (speedLabel != null) ...[
                       const Spacer(),
                       Text(
-                        '${reading.gpsSpeed!.toStringAsFixed(1)} m/s',
-                        style: AppTypography.numericSub,
+                        speedLabel,
+                        style: AppTypography.labelSmall,
                       ),
                     ],
                   ],

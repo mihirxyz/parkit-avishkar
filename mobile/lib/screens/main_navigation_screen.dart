@@ -1,9 +1,8 @@
-
 import 'package:flutter/material.dart';
+
 import '../core/theme/app_colors.dart';
 import 'home_dashboard_screen.dart';
 import 'zone_map_screen.dart';
-import 'fl_metrics_screen.dart';
 
 /// Root navigation shell with smooth tab switching.
 class MainNavigationScreen extends StatefulWidget {
@@ -16,20 +15,22 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = const [
-    HomeDashboardScreen(),
-    ZoneMapScreen(),
-    FLMetricsScreen(),
-  ];
+  void _switchToTab(int index) {
+    if (_currentIndex != index) {
+      setState(() => _currentIndex = index);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final screens = [
+      HomeDashboardScreen(onOpenMap: () => _switchToTab(1)),
+      const ZoneMapScreen(),
+    ];
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _currentIndex, children: screens),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           border: Border(
@@ -55,14 +56,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 isActive: _currentIndex == 1,
               ),
               label: 'Zone Map',
-            ),
-            BottomNavigationBarItem(
-              icon: _AnimatedNavIcon(
-                icon: Icons.insights_outlined,
-                activeIcon: Icons.insights_rounded,
-                isActive: _currentIndex == 2,
-              ),
-              label: 'How It Works',
             ),
           ],
         ),

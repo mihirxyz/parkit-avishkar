@@ -56,7 +56,7 @@ class OccupancyRadialGauge extends StatelessWidget {
                 'Occupied',
                 style: TextStyle(
                   fontSize: 10,
-                  color: AppColors.textMuted,
+                  color: AppColors.textSecondary,
                   fontWeight: FontWeight.w600,
                 ),
               ),

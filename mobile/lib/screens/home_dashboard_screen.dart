@@ -5,14 +5,19 @@ import 'package:provider/provider.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_typography.dart';
 import '../providers/parking_provider.dart';
+import '../widgets/cards/how_parkit_works_card.dart';
 import '../widgets/cards/parking_option_card.dart';
+import '../widgets/feedback/custom_shimmer.dart';
+import 'fl_metrics_screen.dart';
 import 'vehicle_simulator_sheet.dart';
 import 'zone_detail_screen.dart';
 import 'zone_map_screen.dart';
 
 /// Friendly, non-technical home screen answering "where can I park?"
 class HomeDashboardScreen extends StatefulWidget {
-  const HomeDashboardScreen({super.key});
+  final VoidCallback? onOpenMap;
+
+  const HomeDashboardScreen({super.key, this.onOpenMap});
 
   @override
   State<HomeDashboardScreen> createState() => _HomeDashboardScreenState();
@@ -25,6 +30,17 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ParkingProvider>().fetchZones();
     });
+  }
+
+  void _openZoneMap(BuildContext context) {
+    if (widget.onOpenMap != null) {
+      widget.onOpenMap!();
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ZoneMapScreen()),
+      );
+    }
   }
 
   @override
@@ -66,42 +82,51 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           ),
         ],
       ),
-      body: provider.isLoading && provider.zones.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : provider.hasError && provider.zones.isEmpty
-              ? _buildErrorState(provider)
-              : _buildContent(context, provider),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        child: provider.isLoading && provider.zones.isEmpty
+            ? const HomeDashboardSkeleton()
+            : provider.hasError && provider.zones.isEmpty
+                ? _buildErrorState(provider)
+                : provider.zones.isEmpty
+                    ? _buildEmptyState(provider)
+                    : _buildContent(context, provider),
+      ),
     );
   }
 
   Widget _buildContent(BuildContext context, ParkingProvider provider) {
     final totalAvailable = provider.totalAvailable;
     final zoneCount = provider.zones.length;
+    final bestZoneId = provider.bestZone?.zoneId;
 
-    // Sort zones by most available first (lowest occupancy)
     final sortedZones = List.of(provider.zones)
-      ..sort((a, b) => a.occupancyRate.compareTo(b.occupancyRate));
+      ..sort((a, b) {
+        final byFree = b.availableSpots.compareTo(a.availableSpots);
+        if (byFree != 0) return byFree;
+        return a.occupancyRate.compareTo(b.occupancyRate);
+      });
 
-    // Take top 3-4 zones with best availability
     final topZones = sortedZones.take(4).toList();
 
     return RefreshIndicator(
       onRefresh: () => provider.fetchZones(),
+      color: AppColors.primary,
+      backgroundColor: AppColors.surfaceElevated,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Hero headline
-            _buildHeadline(totalAvailable, zoneCount),
-            const SizedBox(height: 20),
-
-            // Value proposition chip
+            _buildHeadline(
+              totalAvailable,
+              zoneCount,
+              provider.updatedTimestampLabel,
+            ),
+            const SizedBox(height: 16),
             _buildValuePropChip(),
-            const SizedBox(height: 32),
-
-            // Section header
+            const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -110,30 +135,27 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                   style: AppTypography.displayMedium.copyWith(fontSize: 20),
                 ),
                 TextButton.icon(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ZoneMapScreen(),
-                    ),
-                  ),
+                  onPressed: () => _openZoneMap(context),
                   icon: const Icon(Icons.map_outlined, size: 16),
                   label: const Text('View Map'),
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.primary,
+                    minimumSize: const Size(44, 44),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-
-            // Top parking options
+            const SizedBox(height: 12),
             ...topZones.asMap().entries.map((entry) {
               final index = entry.key;
               final zone = entry.value;
+              final isRecommended =
+                  bestZoneId != null && zone.zoneId == bestZoneId;
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: ParkingOptionCard(
                   zone: zone,
+                  isRecommended: isRecommended,
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -143,76 +165,62 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                 )
                     .animate()
                     .fadeIn(
-                      duration: const Duration(milliseconds: 400),
-                      delay: Duration(milliseconds: 100 + index * 90),
+                      duration: const Duration(milliseconds: 250),
+                      delay: Duration(milliseconds: 60 + index * 60),
                       curve: Curves.easeOutQuad,
                     )
                     .slideY(
-                      begin: 0.15,
+                      begin: 0.1,
                       end: 0,
-                      duration: const Duration(milliseconds: 400),
-                      delay: Duration(milliseconds: 100 + index * 90),
+                      duration: const Duration(milliseconds: 250),
+                      delay: Duration(milliseconds: 60 + index * 60),
                       curve: Curves.easeOutQuad,
                     ),
               );
             }),
-
+            const SizedBox(height: 16),
+            HowParkItWorksCard(
+              onHowItWorks: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FLMetricsScreen()),
+              ),
+              onTryDemo: () => showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => const VehicleSimulatorSheet(),
+              ),
+            ),
             const SizedBox(height: 24),
-
-            // View full map button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ZoneMapScreen(),
-                  ),
-                ),
+                onPressed: () => _openZoneMap(context),
                 icon: const Icon(Icons.map_rounded),
                 label: const Text('View Full Zone Map'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.background,
+                  minimumSize: const Size(double.infinity, 48),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
               ),
             ),
-
-            const SizedBox(height: 12),
-
-            // Simulate telemetry button (secondary)
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (_) => const VehicleSimulatorSheet(),
-                ),
-                icon: const Icon(Icons.sensors_rounded),
-                label: const Text('Simulate Vehicle Telemetry'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  side: const BorderSide(color: AppColors.primary),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
+            const SizedBox(height: 16),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeadline(int totalAvailable, int zoneCount) {
+  Widget _buildHeadline(
+    int totalAvailable,
+    int zoneCount,
+    String updatedLabel,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -233,7 +241,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               child: totalAvailable > 0
                   ? TweenAnimationBuilder<int>(
                       tween: IntTween(begin: 0, end: totalAvailable),
-                      duration: const Duration(milliseconds: 1000),
+                      duration: const Duration(milliseconds: 800),
                       curve: Curves.easeOutCubic,
                       builder: (context, value, child) {
                         return RichText(
@@ -242,7 +250,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                               TextSpan(
                                 text: '$value ',
                                 style: AppTypography.displayLarge.copyWith(
-                                  fontSize: 38,
+                                  fontSize: 36,
                                   fontWeight: FontWeight.w900,
                                   color: AppColors.textPrimary,
                                   height: 1.1,
@@ -253,7 +261,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                                     ? 'spot available now'
                                     : 'spots available now',
                                 style: AppTypography.displayLarge.copyWith(
-                                  fontSize: 24,
+                                  fontSize: 22,
                                   fontWeight: FontWeight.w600,
                                   color: AppColors.textPrimary,
                                   height: 1.1,
@@ -266,7 +274,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     )
                   : Text(
                       'All zones currently full',
-                      style: AppTypography.displayLarge.copyWith(fontSize: 28),
+                      style: AppTypography.displayLarge.copyWith(fontSize: 26),
                     ),
             ),
           ],
@@ -274,14 +282,40 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         const SizedBox(height: 8),
         Padding(
           padding: const EdgeInsets.only(left: 52),
-          child: Text(
-            totalAvailable > 0
-                ? 'across $zoneCount parking zones in Pune'
-                : 'Check back soon for availability',
-            style: AppTypography.bodyLarge.copyWith(
-              color: AppColors.textMuted,
-              fontSize: 15,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                totalAvailable > 0
+                    ? 'across $zoneCount parking zones in Pune'
+                    : 'Check back soon for availability',
+                style: AppTypography.bodyLarge.copyWith(
+                  color: AppColors.textSecondary,
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: AppColors.occupancyLow,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    updatedLabel,
+                    style: AppTypography.labelSmall.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ],
@@ -290,19 +324,16 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
   Widget _buildValuePropChip() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: AppColors.surfaceElevated,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.surfaceBorder,
-          width: 1,
-        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.surfaceBorder, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
+          const Icon(
             Icons.privacy_tip_outlined,
             size: 18,
             color: AppColors.primary,
@@ -310,14 +341,47 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           const SizedBox(width: 8),
           Flexible(
             child: Text(
-              'Real-time predictions • Powered by on-device AI • No centralized tracking',
+              'Live now • Your location never leaves your phone',
               style: AppTypography.bodyMedium.copyWith(
-                color: AppColors.textSecondary,
-                fontSize: 12,
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(ParkingProvider provider) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.local_parking_rounded,
+              size: 56,
+              color: AppColors.textSecondary,
+            ),
+            const SizedBox(height: 16),
+            Text('No parking areas available', style: AppTypography.titleLarge),
+            const SizedBox(height: 8),
+            Text(
+              'Pull down or tap below to check for live parking spots.',
+              style: AppTypography.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => provider.fetchZones(),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Refresh'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -329,9 +393,9 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline_rounded,
-              size: 64,
+            const Icon(
+              Icons.cloud_off_rounded,
+              size: 56,
               color: AppColors.occupancyHigh,
             ),
             const SizedBox(height: 16),
@@ -341,7 +405,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              provider.errorMessage ?? 'Connection error',
+              'Please check your connection and try again.',
               style: AppTypography.bodyMedium,
               textAlign: TextAlign.center,
             ),
@@ -350,10 +414,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               onPressed: () => provider.fetchZones(),
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('Try Again'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.background,
-              ),
             ),
           ],
         ),
@@ -366,9 +426,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
             Container(
@@ -404,8 +462,12 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
             const SizedBox(height: 8),
             _buildInfoBullet('Vehicle sensors detect parking patterns locally'),
             _buildInfoBullet('Models train on your device, not in the cloud'),
-            _buildInfoBullet('Only model updates are shared, never raw location data'),
-            _buildInfoBullet('Everyone benefits from collective learning without sacrificing privacy'),
+            _buildInfoBullet(
+              'Only model updates are shared, never raw location data',
+            ),
+            _buildInfoBullet(
+              'Everyone benefits from collective learning without sacrificing privacy',
+            ),
             const SizedBox(height: 12),
             Text(
               'Tap "How It Works" in the bottom nav to see technical details and model performance.',
@@ -452,4 +514,3 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     );
   }
 }
-

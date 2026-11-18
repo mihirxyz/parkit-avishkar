@@ -14,6 +14,9 @@ class ParkingProvider extends ChangeNotifier {
   ParkingZone? _selectedZone;
   String? _errorMessage;
   bool _isSubmittingTelemetry = false;
+  bool _isLoadingDetail = false;
+  String? _detailErrorMessage;
+  DateTime? _lastUpdatedAt;
 
   // Selected filter (all, structured, unstructured)
   String _filterType = 'all';
@@ -26,10 +29,51 @@ class ParkingProvider extends ChangeNotifier {
   ParkingZone? get selectedZone => _selectedZone;
   String? get errorMessage => _errorMessage;
   bool get isSubmittingTelemetry => _isSubmittingTelemetry;
+  bool get isLoadingDetail => _isLoadingDetail;
+  String? get detailErrorMessage => _detailErrorMessage;
+  DateTime? get lastUpdatedAt => _lastUpdatedAt;
   String get filterType => _filterType;
 
   bool get isLoading => _status == ParkingStateStatus.loading;
   bool get hasError => _status == ParkingStateStatus.error;
+
+  /// Zone with the most free spots (tie-broken by lowest occupancy rate).
+  /// Returns null if no zones are loaded or all zones have 0 available spots.
+  ParkingZone? get bestZone {
+    if (_zones.isEmpty) return null;
+    final candidates = _zones.where((z) => z.availableSpots > 0).toList();
+    if (candidates.isEmpty) return null;
+    candidates.sort((a, b) {
+      final bySpots = b.availableSpots.compareTo(a.availableSpots);
+      if (bySpots != 0) return bySpots;
+      return a.occupancyRate.compareTo(b.occupancyRate);
+    });
+    return candidates.first;
+  }
+
+  /// Best zone within the currently filtered list (for Zone Map "Best pick" badge).
+  ParkingZone? get bestFilteredZone {
+    final list = filteredZones;
+    if (list.isEmpty) return null;
+    final candidates = list.where((z) => z.availableSpots > 0).toList();
+    if (candidates.isEmpty) return null;
+    candidates.sort((a, b) {
+      final bySpots = b.availableSpots.compareTo(a.availableSpots);
+      if (bySpots != 0) return bySpots;
+      return a.occupancyRate.compareTo(b.occupancyRate);
+    });
+    return candidates.first;
+  }
+
+  /// Human-friendly relative timestamp label for the Home hero
+  String get updatedTimestampLabel {
+    if (_lastUpdatedAt == null) return 'Updated just now';
+    final diff = DateTime.now().difference(_lastUpdatedAt!);
+    if (diff.inSeconds < 60) return 'Updated just now';
+    if (diff.inMinutes == 1) return 'Updated 1 min ago';
+    if (diff.inMinutes < 60) return 'Updated ${diff.inMinutes} mins ago';
+    return 'Updated recently';
+  }
 
   /// Filtered list based on current filter type
   List<ParkingZone> get filteredZones {
@@ -72,6 +116,7 @@ class ParkingProvider extends ChangeNotifier {
       _zones = fetchedZones;
       _status = ParkingStateStatus.success;
       _errorMessage = null;
+      _lastUpdatedAt = DateTime.now();
 
       // Update selectedZone if it is currently open
       if (_selectedZone != null) {
@@ -90,12 +135,18 @@ class ParkingProvider extends ChangeNotifier {
 
   /// Load detail for a single zone (including telemetry history)
   Future<void> loadZoneDetail(String zoneId) async {
+    _isLoadingDetail = true;
+    _detailErrorMessage = null;
+    notifyListeners();
+
     try {
       final detail = await _apiService.fetchZoneDetail(zoneId);
       _selectedZone = detail;
-      notifyListeners();
+      _detailErrorMessage = null;
     } catch (e) {
-      _errorMessage = e.toString();
+      _detailErrorMessage = e.toString();
+    } finally {
+      _isLoadingDetail = false;
       notifyListeners();
     }
   }

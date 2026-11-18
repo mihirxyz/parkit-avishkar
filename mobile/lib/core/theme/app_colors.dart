@@ -48,6 +48,28 @@ class AppColors {
     return occupancyHigh;
   }
 
+  /// Plain-language status word matching [forOccupancy] thresholds:
+  /// < 50% -> "Plenty free", 50-79% -> "Filling up", >= 80% -> "Almost full"
+  static String statusLabelForOccupancy(double rate) {
+    if (rate < 0.50) return 'Plenty free';
+    if (rate < 0.80) return 'Filling up';
+    return 'Almost full';
+  }
+
+  /// Longer plain-language status description for detail views
+  static String statusDescriptionForOccupancy(double rate) {
+    if (rate < 0.50) return 'Plenty free — easy to find a spot';
+    if (rate < 0.80) return 'Filling up — a few spots left';
+    return 'Almost full — limited space right now';
+  }
+
+  /// Status icon matching [forOccupancy] thresholds
+  static IconData iconForOccupancy(double rate) {
+    if (rate < 0.50) return Icons.check_circle_rounded;
+    if (rate < 0.80) return Icons.schedule_rounded;
+    return Icons.error_rounded;
+  }
+
   /// Dynamic helper returning polygon fill color with balanced alpha
   static Color polygonFill(double rate, {int alpha = 70}) {
     return forOccupancy(rate).withAlpha(alpha);

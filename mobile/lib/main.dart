@@ -29,7 +29,7 @@ class ParkItApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
-        title: 'ParkIt FL',
+        title: 'ParkIt',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,
         home: const MainNavigationScreen(),
